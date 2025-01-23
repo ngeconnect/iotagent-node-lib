@@ -60,6 +60,23 @@ const iotAgentConfig = {
                 }
             ]
         },
+        LightNoTimestamp: {
+            commands: [],
+            type: 'Light',
+            lazy: [
+                {
+                    name: 'temperature',
+                    type: 'centigrades'
+                }
+            ],
+            timestamp: false,
+            active: [
+                {
+                    name: 'pressure',
+                    type: 'Hgmm'
+                }
+            ]
+        },
         BrokenLight: {
             commands: [],
             lazy: [
@@ -139,11 +156,58 @@ const iotAgentConfig = {
                     }
                 }
             ]
+        },
+        StupidDevice: {
+            type: 'StupidDevice',
+            commands: [],
+            lazy: [],
+            staticAttributes: [],
+            active: [
+                {
+                    name: 'type',
+                    object_id: 't',
+                    type: 'text'
+                },
+                {
+                    name: 'id',
+                    object_id: 'i',
+                    type: 'text'
+                },
+                {
+                    name: 'meas',
+                    object_id: 'm',
+                    type: 'String'
+                }
+            ]
+        },
+        StupidDevice2: {
+            type: 'StupidDevice2',
+            commands: [],
+            lazy: [],
+            staticAttributes: [],
+            active: [
+                {
+                    name: 'type',
+                    object_id: 'type',
+                    type: 'text'
+                },
+                {
+                    name: 'id',
+                    object_id: 'id',
+                    type: 'text'
+                },
+                {
+                    name: 'meas',
+                    object_id: 'meas',
+                    type: 'String'
+                }
+            ]
         }
     },
     service: 'smartgondor',
     subservice: 'gardens',
-    providerUrl: 'http://smartgondor.com'
+    providerUrl: 'http://smartgondor.com',
+    useCBflowControl: true
 };
 
 describe('NGSI-v2 - Active attributes test', function () {
@@ -176,10 +240,9 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentLib.activate(iotAgentConfig, done);
@@ -187,27 +250,6 @@ describe('NGSI-v2 - Active attributes test', function () {
 
         it('should change the value of the corresponding attribute in the context broker', function (done) {
             iotAgentLib.update('light1', 'Light', '', values, function (error) {
-                should.not.exist(error);
-                contextBrokerMock.done();
-                done();
-            });
-        });
-
-        it('should ignore if wrong type or id are target atributes in the context broker', function (done) {
-            const wrongvalues = [
-                {
-                    name: 'type',
-                    type: 'string',
-                    value: 'wrongtype'
-                },
-                {
-                    name: 'id',
-                    type: 'string',
-                    value: 'wrongid'
-                }
-            ];
-
-            iotAgentLib.update('light1', 'Light', '', wrongvalues.concat(values), function (error) {
                 should.not.exist(error);
                 contextBrokerMock.done();
                 done();
@@ -242,10 +284,9 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContextTimestamp.json')
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentConfig.timestamp = true;
@@ -261,6 +302,108 @@ describe('NGSI-v2 - Active attributes test', function () {
 
         it('should add the timestamp to the entity and all the attributes', function (done) {
             iotAgentLib.update('light1', 'Light', '', modifiedValues, function (error) {
+                should.not.exist(error);
+                contextBrokerMock.done();
+                done();
+            });
+        });
+    });
+
+    describe('When the IoT Agent receives new information and the timestamp flag is false', function () {
+        let modifiedValues;
+
+        beforeEach(function (done) {
+            modifiedValues = [
+                {
+                    name: 'state',
+                    type: 'boolean',
+                    value: true
+                },
+                {
+                    name: 'dimming',
+                    type: 'number',
+                    value: 87
+                }
+            ];
+
+            nock.cleanAll();
+
+            contextBrokerMock = nock('http://192.168.1.1:1026')
+                .matchHeader('fiware-service', 'smartgondor')
+                .matchHeader('fiware-servicepath', 'gardens')
+                .post(
+                    '/v2/entities?options=upsert,flowControl',
+                    utils.readExampleFile(
+                        './test/unit/ngsiv2/examples/contextRequests/updateContextTimestampFalse.json'
+                    )
+                )
+                .reply(204);
+
+            iotAgentConfig.timestamp = false;
+            iotAgentLib.activate(iotAgentConfig, done);
+        });
+
+        afterEach(function (done) {
+            delete iotAgentConfig.timestamp;
+
+            done();
+        });
+
+        it('should not add the timestamp to the entity and the attributes', function (done) {
+            iotAgentLib.update('lightNoTimestamp1', 'LightNoTimestamp', '', modifiedValues, function (error) {
+                should.not.exist(error);
+                contextBrokerMock.done();
+                done();
+            });
+        });
+    });
+
+    describe('When the IoT Agent receives new information and the timestamp flag is false but the measure contains timeInstant', function () {
+        let modifiedValues;
+
+        beforeEach(function (done) {
+            const time = new Date(1438760101468); // 2015-08-05T07:35:01.468+00:00
+
+            modifiedValues = [
+                {
+                    name: 'state',
+                    type: 'boolean',
+                    value: true
+                },
+                {
+                    name: 'TimeInstant',
+                    type: 'DateTime',
+                    value: '2015-12-14T08:06:01.468Z'
+                }
+            ];
+
+            timekeeper.freeze(time);
+            nock.cleanAll();
+
+            contextBrokerMock = nock('http://192.168.1.1:1026')
+                .matchHeader('fiware-service', 'smartgondor')
+                .matchHeader('fiware-servicepath', 'gardens')
+                .post(
+                    '/v2/entities?options=upsert,flowControl',
+                    utils.readExampleFile(
+                        './test/unit/ngsiv2/examples/contextRequests/updateContextTimestampFalseTimeInstant.json'
+                    )
+                )
+                .reply(204);
+
+            iotAgentConfig.timestamp = false;
+            iotAgentLib.activate(iotAgentConfig, done);
+        });
+
+        afterEach(function (done) {
+            delete iotAgentConfig.timestamp;
+            timekeeper.reset();
+
+            done();
+        });
+
+        it('should add the timestamp attribute to the entity but not as attribute metadata', function (done) {
+            iotAgentLib.update('lightNoTimestamp1', 'LightNoTimestamp', '', modifiedValues, function (error) {
                 should.not.exist(error);
                 contextBrokerMock.done();
                 done();
@@ -333,12 +476,11 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextTimestampOverrideWithoutMilis.json'
                     )
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentConfig.timestamp = true;
@@ -361,7 +503,7 @@ describe('NGSI-v2 - Active attributes test', function () {
         });
     });
 
-    describe('When the IoT Agent receives new information, the timestamp flag is onand timezone is defined', function () {
+    describe('When the IoT Agent receives new information, the timestamp flag is on and timezone is defined', function () {
         let modifiedValues;
 
         beforeEach(function (done) {
@@ -388,12 +530,11 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextTimestampTimezone.json'
                     )
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentConfig.timestamp = true;
@@ -445,12 +586,11 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextTimestampOverride.json'
                     )
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentConfig.timestamp = true;
@@ -500,12 +640,11 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextTimestampOverride.json'
                     )
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentConfig.timestamp = true;
@@ -555,10 +694,9 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
                 )
-                .query({ type: 'Light' })
                 .reply(
                     413,
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextResponses/updateContext1Failed.json')
@@ -588,10 +726,9 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
                 )
-                .query({ type: 'Light' })
                 .reply(
                     400,
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextResponses/updateContext2Failed.json')
@@ -618,10 +755,9 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
                 )
-                .query({ type: 'Light' })
                 .reply(
                     500,
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextResponses/updateContext2Failed.json')
@@ -651,10 +787,9 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/humSensor/attrs',
-                    utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
+                    '/v2/entities?options=upsert,flowControl',
+                    utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext5.json')
                 )
-                .query({ type: 'Humidity' })
                 .reply(204);
 
             iotAgentLib.activate(iotAgentConfig, done);
@@ -685,12 +820,11 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/motion1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextStaticAttributes.json'
                     )
                 )
-                .query({ type: 'Motion' })
                 .reply(204);
 
             iotAgentLib.activate(iotAgentConfig, done);
@@ -721,12 +855,11 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/lamp1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextStaticAttributesMetadata.json'
                     )
                 )
-                .query({ type: 'Lamp' })
                 .reply(204);
 
             iotAgentLib.activate(iotAgentConfig, done);
@@ -740,7 +873,7 @@ describe('NGSI-v2 - Active attributes test', function () {
         });
     });
 
-    describe('When the IoT Agent receives new information from a device and the appendMode flag is on', function () {
+    describe('When the IoT Agent receives new information from a device', function () {
         beforeEach(function (done) {
             nock.cleanAll();
 
@@ -748,24 +881,180 @@ describe('NGSI-v2 - Active attributes test', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/light1/attrs',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
-            iotAgentConfig.appendMode = true;
             iotAgentLib.activate(iotAgentConfig, done);
         });
 
         afterEach(function (done) {
-            iotAgentConfig.appendMode = false;
-
             done();
         });
 
         it('should change the value of the corresponding attribute in the context broker', function (done) {
             iotAgentLib.update('light1', 'Light', '', values, function (error) {
+                should.not.exist(error);
+                contextBrokerMock.done();
+                done();
+            });
+        });
+    });
+
+    describe('When the IoT Agent receives autoprovisioned id and type measures', function () {
+        const valuesIdType = [
+            {
+                name: 'id',
+                type: 'aTypeProvidedByIoTACodeCallingUpdateOnLib1',
+                value: 'idIoTA'
+            },
+            {
+                name: 'type',
+                type: 'aTypeProvidedByIoTACodeCallingUpdateOnLib2',
+                value: 'typeIoTA'
+            },
+            {
+                name: 'm',
+                type: 'aTypeProvidedByIoTACodeCallingUpdateOnLib3',
+                value: 'measIoTA'
+            }
+        ];
+
+        beforeEach(function (done) {
+            nock.cleanAll();
+
+            // Note that in the case of measure_id and measure_type the type provided by the IOTA when calling iotAgentLib.update()
+            // is used (thus ignoring the one of the StupidDevice group for id or type, which is 'text') but in the case of measIoTA the type provided in the
+            // provisioning ('String') is used
+            contextBrokerMock = nock('http://192.168.1.1:1026')
+                .matchHeader('fiware-service', 'smartgondor')
+                .matchHeader('fiware-servicepath', 'gardens')
+                .post('/v2/entities?options=upsert,flowControl', {
+                    id: 'stupiddevice1',
+                    type: 'StupidDevice',
+                    meas: {
+                        value: 'measIoTA',
+                        type: 'String'
+                    },
+                    measure_id: {
+                        type: 'aTypeProvidedByIoTACodeCallingUpdateOnLib1',
+                        value: 'idIoTA'
+                    },
+                    measure_type: {
+                        type: 'aTypeProvidedByIoTACodeCallingUpdateOnLib2',
+                        value: 'typeIoTA'
+                    }
+                })
+                .reply(204);
+
+            iotAgentLib.activate(iotAgentConfig, done);
+        });
+
+        it('should not affect to the real ID and Type to store in the context broker', function (done) {
+            iotAgentLib.update('stupiddevice1', 'StupidDevice', '', valuesIdType, function (error) {
+                should.not.exist(error);
+                contextBrokerMock.done();
+                done();
+            });
+        });
+    });
+
+    describe('When the IoT Agent receives provisioned id and type measures with different object_id names', function () {
+        const valuesIdType2 = [
+            {
+                name: 'i',
+                type: 'text',
+                value: 'idIoTA2'
+            },
+            {
+                name: 't',
+                type: 'text',
+                value: 'typeIoTA2'
+            },
+            {
+                name: 'm',
+                type: 'text',
+                value: 'measIoTA2'
+            }
+        ];
+
+        beforeEach(function (done) {
+            nock.cleanAll();
+
+            contextBrokerMock = nock('http://192.168.1.1:1026')
+                .matchHeader('fiware-service', 'smartgondor')
+                .matchHeader('fiware-servicepath', 'gardens')
+                .post('/v2/entities?options=upsert,flowControl', {
+                    id: 'stupiddevice2',
+                    type: 'StupidDevice',
+                    meas: {
+                        value: 'measIoTA2',
+                        type: 'String'
+                    }
+                })
+                .reply(204);
+
+            iotAgentLib.activate(iotAgentConfig, done);
+        });
+
+        it('should not affect to the real ID and Type to store in the context broker', function (done) {
+            iotAgentLib.update('stupiddevice2', 'StupidDevice', '', valuesIdType2, function (error) {
+                should.not.exist(error);
+                contextBrokerMock.done();
+                done();
+            });
+        });
+    });
+
+    describe('When the IoT Agent receives provisioned id and type measures with the same object_id name', function () {
+        const valuesIdType3 = [
+            {
+                name: 'id',
+                type: 'text',
+                value: 'idIoTA'
+            },
+            {
+                name: 'type',
+                type: 'text',
+                value: 'typeIoTA'
+            },
+            {
+                name: 'meas',
+                type: 'text',
+                value: 'measIoTA'
+            }
+        ];
+
+        beforeEach(function (done) {
+            nock.cleanAll();
+
+            contextBrokerMock = nock('http://192.168.1.1:1026')
+                .matchHeader('fiware-service', 'smartgondor')
+                .matchHeader('fiware-servicepath', 'gardens')
+                .post('/v2/entities?options=upsert,flowControl', {
+                    id: 'stupiddevice3',
+                    type: 'StupidDevice2',
+                    meas: {
+                        value: 'measIoTA',
+                        type: 'String'
+                    },
+                    measure_id: {
+                        value: 'idIoTA',
+                        type: 'text'
+                    },
+                    measure_type: {
+                        value: 'typeIoTA',
+                        type: 'text'
+                    }
+                })
+                .reply(204);
+
+            iotAgentLib.activate(iotAgentConfig, done);
+        });
+
+        it('should not affect to the real ID and Type to store in the context broker', function (done) {
+            iotAgentLib.update('stupiddevice3', 'StupidDevice2', '', valuesIdType3, function (error) {
                 should.not.exist(error);
                 contextBrokerMock.done();
                 done();
@@ -782,11 +1071,10 @@ describe('NGSI-v2 - Active attributes test', function () {
             contextBrokerMock = nock('http://cbhost:1026')
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
-                .patch(
-                    '/v2/entities/light1/attrs',
-                    utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext.json')
+                .post(
+                    '/v2/entities?options=upsert,flowControl',
+                    utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContext6.json')
                 )
-                .query({ type: 'Light' })
                 .reply(204);
 
             iotAgentLib.activate(iotAgentConfig, done);

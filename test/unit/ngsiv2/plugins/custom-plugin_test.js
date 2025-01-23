@@ -57,7 +57,8 @@ const iotAgentConfig = {
     },
     service: 'smartgondor',
     subservice: 'gardens',
-    providerUrl: 'http://smartgondor.com'
+    providerUrl: 'http://smartgondor.com',
+    useCBflowControl: true
 };
 
 describe('NGSI-v2 - Custom plugin', function () {
@@ -111,8 +112,7 @@ describe('NGSI-v2 - Custom plugin', function () {
             contextBrokerMock = nock('http://192.168.1.1:1026')
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
-                .post('/v2/entities/light1/attrs')
-                .query({ type: 'Light' })
+                .post('/v2/entities?options=upsert,flowControl')
                 .reply(204);
         });
 

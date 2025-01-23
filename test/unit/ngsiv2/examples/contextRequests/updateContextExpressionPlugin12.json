@@ -1,6 +1,4 @@
 {
-  "consumption_x": {
-    "type": "Number",
-    "value": null
-  }
+  "id":"light1",
+  "type":"Light"
 }

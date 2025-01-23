@@ -55,17 +55,7 @@ const iotAgentConfig = {
     types: {
         Robot: {
             internalAttributes: [],
-            commands: [
-                {
-                    name: 'position',
-                    object_id: 'pos',
-                    type: 'Object'
-                },
-                {
-                    name: 'orientation',
-                    type: 'Object'
-                }
-            ],
+            commands: [],
             lazy: [
                 {
                     name: 'batteryLevel',
@@ -82,7 +72,18 @@ const iotAgentConfig = {
 const device3 = {
     id: 'r2d2',
     type: 'Robot',
-    service: 'smartgondor'
+    service: 'smartgondor',
+    commands: [
+        {
+            name: 'position',
+            object_id: 'pos',
+            type: 'Object'
+        },
+        {
+            name: 'orientation',
+            type: 'Object'
+        }
+    ]
 };
 
 describe('NGSI-LD - Merge-Patch functionalities', function () {

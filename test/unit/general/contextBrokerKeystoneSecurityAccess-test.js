@@ -85,7 +85,8 @@ const iotAgentConfig = {
     service: 'smartgondor',
     subservice: 'gardens',
     providerUrl: 'http://smartgondor.com',
-    deviceRegistrationDuration: 'P1M'
+    deviceRegistrationDuration: 'P1M',
+    useCBflowControl: true
 };
 
 describe('NGSI-v2 - Secured access to the Context Broker with Keystone', function () {
@@ -128,8 +129,7 @@ describe('NGSI-v2 - Secured access to the Context Broker with Keystone', functio
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'electricity')
                 .matchHeader('X-Auth-Token', '12345679ABCDEF')
-                .post('/v2/entities/light1/attrs')
-                .query({ type: 'Light' })
+                .post('/v2/entities?options=upsert,flowControl')
                 .reply(204);
             iotAgentLib.activate(iotAgentConfig, done);
         });
@@ -166,8 +166,7 @@ describe('NGSI-v2 - Secured access to the Context Broker with Keystone', functio
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'electricity')
                 .matchHeader('X-Auth-Token', '12345679ABCDEF')
-                .post('/v2/entities/light1/attrs')
-                .query({ type: 'Light' })
+                .post('/v2/entities?options=upsert,flowControl')
                 .reply(403, { name: 'ACCESS_FORBIDDEN' });
 
             iotAgentLib.activate(iotAgentConfig, done);
@@ -199,8 +198,7 @@ describe('NGSI-v2 - Secured access to the Context Broker with Keystone', functio
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'electricity')
                 .matchHeader('X-Auth-Token', '12345679ABCDEF')
-                .post('/v2/entities/light1/attrs')
-                .query({ type: 'Light' });
+                .post('/v2/entities?options=upsert,flowControl');
 
             iotAgentLib.activate(iotAgentConfig, done);
         });
@@ -279,13 +277,6 @@ describe('NGSI-v2 - Secured access to the Context Broker with Keystone', functio
                 contextBrokerMock = nock('http://192.168.1.1:1026');
 
                 contextBrokerMock
-                    .matchHeader('fiware-service', 'smartgondor')
-                    .matchHeader('fiware-servicepath', 'electricity')
-                    .matchHeader('X-Auth-Token', '12345679ABCDEF')
-                    .post('/v2/entities?options=upsert')
-                    .reply(204);
-
-                contextBrokerMock
                     .post('/v2/registrations')
                     .reply(201, null, { Location: '/v2/registrations/6319a7f5254b05844116584d' });
 
@@ -303,7 +294,7 @@ describe('NGSI-v2 - Secured access to the Context Broker with Keystone', functio
         });
 
         it('subscribe requests use auth header', function (done) {
-            iotAgentLib.getDevice('Light1', 'smartgondor', 'electricity', function (error, device) {
+            iotAgentLib.getDevice('Light1', null, 'smartgondor', 'electricity', function (error, device) {
                 iotAgentLib.subscribe(device, ['dimming'], null, function (error) {
                     should.not.exist(error);
 
@@ -324,7 +315,7 @@ describe('NGSI-v2 - Secured access to the Context Broker with Keystone', functio
                     'X-Subject-Token': '12345679ABCDEF'
                 });
 
-            iotAgentLib.getDevice('Light1', 'smartgondor', 'electricity', function (error, device) {
+            iotAgentLib.getDevice('Light1', null, 'smartgondor', 'electricity', function (error, device) {
                 iotAgentLib.subscribe(device, ['dimming'], null, function (error) {
                     iotAgentLib.unsubscribe(device, '51c0ac9ed714fb3b37d7d5a8', function (error) {
                         contextBrokerMock.done();

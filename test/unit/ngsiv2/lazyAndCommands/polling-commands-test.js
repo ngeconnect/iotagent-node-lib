@@ -126,7 +126,8 @@ const iotAgentConfig = {
     subservice: 'gardens',
     providerUrl: 'http://smartgondor.com',
     pollingExpiration: 200,
-    pollingDaemonFrequency: 20
+    pollingDaemonFrequency: 20,
+    useCBflowControl: true
 };
 const device3 = {
     id: 'r2d2',
@@ -158,7 +159,7 @@ describe('NGSI-v2 - Polling commands', function () {
         contextBrokerMock
             .matchHeader('fiware-service', 'smartgondor')
             .matchHeader('fiware-servicepath', 'gardens')
-            .post('/v2/entities?options=upsert')
+            .post('/v2/entities?options=upsert,flowControl')
             .reply(204);
 
         iotAgentLib.activate(iotAgentConfig, done);
@@ -180,7 +181,7 @@ describe('NGSI-v2 - Polling commands', function () {
 
     describe('When a command update arrives to the IoT Agent for a device with polling', function () {
         const options = {
-            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update',
+            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update?options=flowControl',
             method: 'POST',
             json: {
                 actionType: 'update',
@@ -202,14 +203,7 @@ describe('NGSI-v2 - Polling commands', function () {
         };
 
         beforeEach(function (done) {
-            statusAttributeMock = nock('http://192.168.1.1:1026')
-                .matchHeader('fiware-service', 'smartgondor')
-                .matchHeader('fiware-servicepath', 'gardens')
-                .post(
-                    '/v2/entities/Robot:r2d2/attrs?type=Robot',
-                    utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContextCommandStatus.json')
-                )
-                .reply(204);
+            statusAttributeMock = nock('http://192.168.1.1:1026');
 
             iotAgentLib.register(device3, function (error) {
                 done();
@@ -271,7 +265,7 @@ describe('NGSI-v2 - Polling commands', function () {
 
     describe('When a command arrives with multiple values in the value field', function () {
         const options = {
-            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update',
+            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update?options=flowControl',
             method: 'POST',
             json: {
                 actionType: 'update',
@@ -300,7 +294,7 @@ describe('NGSI-v2 - Polling commands', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/Robot:r2d2/attrs?type=Robot',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContextCommandStatus.json')
                 )
                 .reply(204);
@@ -327,7 +321,7 @@ describe('NGSI-v2 - Polling commands', function () {
 
     describe('When a polling command expires', function () {
         const options = {
-            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update',
+            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update?options=flowControl',
             method: 'POST',
             json: {
                 actionType: 'update',
@@ -353,16 +347,7 @@ describe('NGSI-v2 - Polling commands', function () {
                 .matchHeader('fiware-service', 'smartgondor')
                 .matchHeader('fiware-servicepath', 'gardens')
                 .post(
-                    '/v2/entities/Robot:r2d2/attrs?type=Robot',
-                    utils.readExampleFile('./test/unit/ngsiv2/examples/contextRequests/updateContextCommandStatus.json')
-                )
-                .reply(204);
-
-            statusAttributeMock = nock('http://192.168.1.1:1026')
-                .matchHeader('fiware-service', 'smartgondor')
-                .matchHeader('fiware-servicepath', 'gardens')
-                .post(
-                    '/v2/entities/Robot:r2d2/attrs?type=Robot',
+                    '/v2/entities?options=upsert,flowControl',
                     utils.readExampleFile(
                         './test/unit/ngsiv2/examples/contextRequests/updateContextCommandExpired.json'
                     )
@@ -422,7 +407,7 @@ describe('NGSI-v2 - Polling commands expressions', function () {
         contextBrokerMock
             .matchHeader('fiware-service', 'smartgondor')
             .matchHeader('fiware-servicepath', 'gardens')
-            .post('/v2/entities?options=upsert')
+            .post('/v2/entities?options=upsert,flowControl')
             .reply(204);
 
         iotAgentConfig.pollingExpiration = 0;
@@ -446,7 +431,7 @@ describe('NGSI-v2 - Polling commands expressions', function () {
 
     describe('When a command update arrives to the IoT Agent for a device with polling', function () {
         const options = {
-            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update',
+            url: 'http://localhost:' + iotAgentConfig.server.port + '/v2/op/update?options=flowControl',
             method: 'POST',
             json: {
                 actionType: 'update',
@@ -468,16 +453,7 @@ describe('NGSI-v2 - Polling commands expressions', function () {
         };
 
         beforeEach(function (done) {
-            statusAttributeMock = nock('http://192.168.1.1:1026')
-                .matchHeader('fiware-service', 'smartgondor')
-                .matchHeader('fiware-servicepath', 'gardens')
-                .post(
-                    '/v2/entities/RobotExp:r2d4/attrs?type=RobotExp',
-                    utils.readExampleFile(
-                        './test/unit/ngsiv2/examples/contextRequests/updateContextCommandStatus2.json'
-                    )
-                )
-                .reply(204);
+            statusAttributeMock = nock('http://192.168.1.1:1026');
 
             iotAgentLib.register(device4, function (error) {
                 done();
